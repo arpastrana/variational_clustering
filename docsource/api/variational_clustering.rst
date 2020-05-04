@@ -1,0 +1,2 @@
+
+.. automodule:: variational_clustering
