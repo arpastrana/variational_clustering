@@ -49,7 +49,7 @@ def get_new_clusters(clusters, faces):
         cluster.harvest_faces(faces)
         cluster.set_proxy()
 
-        n_cluster = Cluster(cluster.id, cluster.get_new_seed())
+        n_cluster = Cluster(cluster.id, cluster.get_best_new_seed())
         n_clusters[n_cluster.id] = n_cluster
         cluster.clear_faces()  # clears out cluster and face relationship
 
@@ -61,16 +61,12 @@ def clear_clusters(faces):
         face.clear_cluster()
 
 
-def make_faces(mesh, tag, weight=False):  # no dep
+def make_faces(mesh, tag):  # no dep
     faces = {}
-
-    # keys = keys or s_mesh.c_mesh.faces()
-    # keys = keys or mesh.faces()
 
     for f_key in mesh.faces():
         face = Face(f_key)
-        # halfedges = s_mesh.cMesh.face_halfedges(f_key)
-        # vector = s_mesh.cMesh.get_face_attribute(f_key, tag)
+
         halfedges = mesh.face_halfedges(f_key)
         vector = mesh.face_attribute(f_key, tag)
 
@@ -80,7 +76,7 @@ def make_faces(mesh, tag, weight=False):  # no dep
         face.set_neighbours(mesh.face_neighbors(f_key))
 
         face.set_vector(vector)
-        face.set_weighed_vector(weight)
+        face.set_weighed_vector(vector)
         face.set_angle(vector)
 
         faces[f_key] = face

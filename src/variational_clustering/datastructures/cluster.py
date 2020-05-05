@@ -2,7 +2,9 @@ import compas.geometry as cg
 
 from functools import reduce
 
-from variational_clustering.datastructures import proxy_maker
+from compas.utilities import geometric_key
+
+from variational_clustering.datastructures import Proxy
 from variational_clustering.metrics import distortion
 
 from variational_clustering.helpers import align_vector
@@ -31,6 +33,7 @@ class Cluster():
     def absorb_cluster(self, other_cluster):
         for o_face in other_cluster.faces:
             self.add_face(o_face)
+
         self.set_proxy()
         self.set_faces_in_cluster()
 
@@ -58,10 +61,8 @@ class Cluster():
         for key in self.faces_keys:
             self.faces.append(faces.get(key))
 
-    def get_weighed_vectors(self):
-        return [face.w_vector for face in self.faces]
-
     def get_vectors(self):
+        # return [face.w_vector for face in self.faces]
         return [face.vector for face in self.faces]
 
     def get_angles(self):
@@ -72,28 +73,19 @@ class Cluster():
             face.cluster = self.id
 
     def set_proxy(self):
-        func = self.set_vector_proxy
-        # func = self.set_angle_proxy
-        return func()
-
-    def set_vector_proxy(self):  # NEW
-        w_ve = self.get_vectors()
-        w_ve = list(map(lambda x: align_vector(x, w_ve[0]), w_ve))
-        r_ve = reduce(lambda x, y: cg.add_vectors(x, y), w_ve)
-        self.proxy = cg.normalize_vector(r_ve)
-
-    def set_angle_proxy(self):
-        angles = self.get_angles()
-        self.proxy = proxy_maker(angles)  # average...median?
+        _proxy = Proxy()
+        self.proxy = _proxy(self.faces)
 
     def get_errors(self):
         return [face.get_error(self.proxy) for face in self.faces]
 
-    def get_new_seed(self):
-        return min(self.faces, key=lambda x: x.get_error(self.proxy)).fkey
+    def get_best_new_seed(self):
+        best_face = min(self.faces, key=lambda x: x.get_error(self.proxy))
+        return best_face.fkey
 
     def get_worst_seed(self):
-        return max(self.faces, key=lambda x: x.get_error(self.proxy)).fkey
+        worst_face = max(self.faces, key=lambda x: x.get_error(self.proxy))
+        return worst_face.fkey
 
     def get_face_keys(self):
         return [f.fkey for f in self.faces]
@@ -106,8 +98,8 @@ class Cluster():
 
     def get_faces_vertices(self):
         face_vertices = set()
-        for f in self.faces:
-            face_vertices.update(f.vertices)
+        for face in self.faces:
+            face_vertices.update(face.vertices)
         return face_vertices
 
     def clear_faces(self):
@@ -132,4 +124,3 @@ class Cluster():
 if __name__ == "__main__":
     cluster = Cluster(0, 0)
     print(cluster)
-

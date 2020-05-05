@@ -1,19 +1,35 @@
 from itertools import combinations
 
 
-__all__ = ["cluster_adjacency", "is_adjacent"]
+__all__ = ["cluster_adjacency"]
 
 
 def cluster_adjacency(clusters):
-    comb = combinations(range(len(clusters)), 2)
-    cl_comb = [(clusters.get(x[0]), clusters.get(x[1])) for x in comb]
-    return list(filter(is_adjacent, cl_comb))
+    comb = combinations(clusters.keys(), 2)
+
+    adjacency = []
+    for ka, kb in comb:
+    	ca, cb = clusters.get(ka), clusters.get(kb)
+
+    	if not is_adjacent_vertices(ca, cb):
+    		continue
+
+    	adjacency.append((ca, cb))
+
+    return adjacency
 
 
-def is_adjacent(cluster_pair):
-    vert_1 = cluster_pair[0].get_faces_halfedges()
-    vert_2 = cluster_pair[1].get_faces_halfedges()
-    return len(vert_1.intersection(vert_2)) > 0
+def is_adjacent_halfedges(cluster_a, cluster_b):
+	a = cluster_a.get_faces_halfedges()
+	b = cluster_b.get_faces_halfedges()
+	ints = len(a.intersection(b))
+	return ints > 0  # if they share more than one edge
+
+def is_adjacent_vertices(cluster_a, cluster_b):
+	a = cluster_a.get_faces_vertices()
+	b = cluster_b.get_faces_vertices()
+	ints = len(a.intersection(b))	
+	return ints > 1  # if they share more than two vertices together
 
 
 if __name__ == "__main__":

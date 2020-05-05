@@ -10,7 +10,7 @@ from variational_clustering.operations import merge_split
 __all__ = ['k_means']
 
 
-def k_means(clusters, faces, iters, mergesplit=False, callback=None):
+def k_means(clusters, faces, iters, mergesplit=True, callback=None):
     '''
     2. Run for N given iterations only.
     1. Create Cluster Colors. Make global *counter*.
@@ -25,7 +25,6 @@ def k_means(clusters, faces, iters, mergesplit=False, callback=None):
     9. Repeat
     '''
     all_clusters = []
-    # print('seeds are: {}'.format([cl.seed for cl_key, cl in clusters.items()]))
 
     for it in range(iters):
 
