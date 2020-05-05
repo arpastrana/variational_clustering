@@ -16,6 +16,8 @@ from compas.datastructures import mesh_unify_cycles
 
 from compas.utilities import i_to_rgb
 from compas.utilities import i_to_black
+from compas.utilities import i_to_red
+from compas.utilities import i_to_blue
 
 from compas_plotters import MeshPlotter
 
@@ -64,27 +66,9 @@ if __name__ == '__main__':
     # Constants
     # ==========================================================================
 
-    HERE = './four_point_slab.json'
-
-    tags = [
-        'n_1',
-        'n_2',
-        'm_1',
-        'm_2',
-        'ps_1_top',
-        'ps_1_bot',
-        'ps_1_mid',
-        'ps_2_top',
-        'ps_2_bot',
-        'ps_2_mid',
-        'custom_1',
-        'custom_2'
-        ]
-
-    NUM = 5
-    ITERS = 5
-    MERGESPLIT = True
-    vector_tag = 'ps_1_top'  # ps_1_top
+    HERE = '../data/json_files/topleft_supported_slab_k25_i50_ms_ps1top.json'
+    HERE = '../data/json_files/four_point_slab_k5_i20_ms_ps1top.json'
+    vector_tag = 'ps_1_top'
 
     # ==========================================================================
     # Import mesh
@@ -104,49 +88,43 @@ if __name__ == '__main__':
         line['width'] = 0.60
 
     # ==========================================================================
-    # Define Callback
+    # Define Callbacks
     # ==========================================================================
 
-    def callback(k, plotter, clusters):
-        num = len(list(clusters.keys()))
+    def label_colors(mesh):
+        num = max(mesh.faces_attribute(name='k_label', keys=mesh.faces()))
 
-        facedict = {}
+        colordict = {}
+        for fkey, attr in mesh.faces(True):
+            label = attr['k_label']
+            color = [i / 255 for i in i_to_rgb(label / num)]
+            colordict[fkey] = color
 
-        for idx, cluster in clusters.items():
-            color = [i / 255 for i in i_to_rgb(idx / num)]
-            for fkey in cluster.faces_keys:
-                facedict[fkey] = color
+        return colordict
 
-        facecolors = facedict.items()
-        facecolors = [x[1] for x in facecolors]
+    # ==========================================================================
+    # Find Vertices
+    # ==========================================================================
 
-        plotter.update_faces(facedict)        
-        plotter.update(pause=0.50)
+    vertices = []
+    for vkey in mesh.vertices():
+        fkeys = mesh.vertex_faces(vkey)
+        labels = mesh.faces_attribute(name='k_label', keys=fkeys)
+        labels = set(labels)
+
+        if len(labels) > 2:
+            vertices.append(vkey)
+
+        elif mesh.is_vertex_on_boundary(vkey):
+            if len(labels) > 1:
+                vertices.append(vkey)
 
     # ==========================================================================
     # Set up Plotter
     # ==========================================================================
 
     plotter = MeshPlotter(mesh, figsize=(12, 9))
-    plotter.draw_lines(lines)
-    plotter.draw_faces()
-    plotter.update(0.5)
-    callback = partial(callback, plotter=plotter)
-
-    # ==========================================================================
-    # K-Means
-    # ==========================================================================
-
-    faces = make_faces(mesh, vector_tag, weight=False)
-    clusters = furthest_init(NUM, faces, callback=callback)
-    
-    sel_clusters = clusters[-1]
-    all_clusters = k_means(sel_clusters, faces, ITERS, MERGESPLIT, callback=callback)
-
-    final_clusters = all_clusters[-1]
-
-    # ==========================================================================
-    # Visualization
-    # ==========================================================================
-
+    # plotter.draw_lines(lines)
+    plotter.draw_faces(facecolor=label_colors(mesh))
+    plotter.draw_vertices(facecolor=(255, 0, 0), keys=vertices, radius=0.05)
     plotter.show()
