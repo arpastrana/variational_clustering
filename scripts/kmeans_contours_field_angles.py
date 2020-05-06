@@ -1,17 +1,16 @@
 import math
 import numpy as np
+import matplotlib.pyplot as plt
 
-from random import choice
 from time import time
-from functools import partial
 
 from numpy import asarray
 from numpy import meshgrid
 from numpy import linspace
 from numpy import amax
 from numpy import amin
+
 from scipy.interpolate import griddata
-import matplotlib.pyplot as plt
 
 from sklearn.cluster import KMeans
 
@@ -21,6 +20,8 @@ from compas.geometry import normalize_vector
 from compas.geometry import length_vector
 from compas.geometry import cross_vectors
 from compas.geometry import angle_vectors
+from compas.geometry import rotate_points
+from compas.geometry import centroid_points
 
 from compas.datastructures import Mesh
 from compas.datastructures import mesh_unify_cycles
@@ -32,23 +33,21 @@ from compas.utilities import i_to_blue
 
 from compas_plotters import MeshPlotter
 
-from variational_clustering.clustering import make_faces
-from variational_clustering.clustering import furthest_init
-from variational_clustering.clustering import k_means
-from variational_clustering.helpers import align_vector
+
+def line_sdl(start, direction, length, both_sides=True):
+
+	direction = normalize_vector(direction[:])
+	a = start
+	b = add_vectors(start, scale_vector(direction, +length))
+	if both_sides:
+		a = add_vectors(start, scale_vector(direction, -length))	
+	return a, b
 
 
 def vector_lines_on_faces(mesh, vector_tag, uniform=True, factor=0.02):
-	'''
-	'''
-	def line_sdl(start, direction, length):
-		direction = normalize_vector(direction[:])
-		a = add_vectors(start, scale_vector(direction, -length))
-		b = add_vectors(start, scale_vector(direction, +length))
-
-		return a, b
 
 	lines = []
+
 	for fkey, attr in mesh.faces(data=True):
 		vector = attr.get(vector_tag)
 
@@ -62,66 +61,69 @@ def vector_lines_on_faces(mesh, vector_tag, uniform=True, factor=0.02):
 
 		pt = mesh.face_centroid(fkey)
 		lines.append(line_sdl(pt, vector, vec_length))
+
 	return lines
 
 
 def line_tuple_to_dict(line):
-	'''
-	'''
+
 	a, b = line
 	return {'start': a, 'end': b}
 
 
 def polygon_list_to_dict(polygon):
+
 	return {'points': polygon}
 
 
 def extract_polygons_from_contours(contours, levels):
+
 	polygons = []
 	for i in range(len(contours)):
-	    level = levels[i]
-	    contour = contours[i]
+		level = levels[i]
+		contour = contours[i]
 
-	    for path in contour:
-	        for polygon in path:
-	            polygons.append(polygon[:-1])
+		for path in contour:
+			for polygon in path:
+				polygons.append(polygon[:-1])
 	return polygons
 
 
 def scalarfield_contours_numpy(xy, s, levels=50, density=100, method='cubic'):
 
-    xy = asarray(xy)
-    s = asarray(s)
-    x = xy[:, 0]
-    y = xy[:, 1]
+	xy = asarray(xy)
+	s = asarray(s)
+	x = xy[:, 0]
+	y = xy[:, 1]
 
-    X, Y = meshgrid(linspace(amin(x), amax(x), 2 * density),
-                    linspace(amin(y), amax(y), 2 * density))
+	X, Y = meshgrid(linspace(amin(x), amax(x), 2 * density),
+					linspace(amin(y), amax(y), 2 * density))
 
-    S = griddata((x, y), s, (X, Y), method=method)
+	S = griddata((x, y), s, (X, Y), method=method)
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, aspect='equal')
-    c = ax.contour(X, Y, S, levels)
+	fig = plt.figure()
+	ax = fig.add_subplot(111, aspect='equal')
+	c = ax.contour(X, Y, S, levels)
 
-    contours = [0] * len(c.collections)
-    levels = c.levels
+	contours = [0] * len(c.collections)
+	levels = c.levels
 
-    for i, coll in enumerate(iter(c.collections)):
-        paths = coll.get_paths()
-        contours[i] = [0] * len(paths)
-        for j, path in enumerate(iter(paths)):
-            polygons = path.to_polygons()
-            contours[i][j] = [0] * len(polygons)
-            for k, polygon in enumerate(iter(polygons)):
-                contours[i][j][k] = polygon
+	for i, coll in enumerate(iter(c.collections)):
+		paths = coll.get_paths()
+		contours[i] = [0] * len(paths)
+		for j, path in enumerate(iter(paths)):
+			polygons = path.to_polygons()
+			contours[i][j] = [0] * len(polygons)
+			for k, polygon in enumerate(iter(polygons)):
+				contours[i][j][k] = polygon
 
-    plt.close(fig)
+	plt.close(fig)
 
-    return levels, contours
+	return levels, contours
 
 
 def contour_polygons(mesh, centers, face_labels, density=100, method='nearest'):
+
 	xy, s = [], []
 
 	for fkey in mesh.faces():
@@ -143,6 +145,7 @@ def contour_polygons(mesh, centers, face_labels, density=100, method='nearest'):
 
 
 def rgb_colors(data):
+
 	assert isinstance(data, dict)
 
 	valuemax = np.amax(np.array(list(data.values())))
@@ -155,6 +158,7 @@ def rgb_colors(data):
 
 
 def cluster(data, n_clusters, reshape=None, normalize=False, random_state=0, n_jobs=-1):
+
 	assert isinstance(data, dict)
 
 	np_data = [x[1] for x in data.items()]
@@ -178,6 +182,7 @@ def cluster(data, n_clusters, reshape=None, normalize=False, random_state=0, n_j
 
 
 def faces_labels(labels, centers):
+
 	centers[centers < 0.1] = 0  # to avoid float rounding precision issues
 	clustered_data = centers[labels].tolist()
 
@@ -203,6 +208,7 @@ def faces_bisector_field(mesh, ref_vector_tag, target_vector_tag):
 
 
 def smoothed_angles(angles, smooth_iters):
+
 	for _ in range(smooth_iters):
 		averaged_angles = {}
 
@@ -218,6 +224,7 @@ def smoothed_angles(angles, smooth_iters):
 
 
 def faces_angles(mesh, vector_tag, ref_vector):
+
 	angles = {}
 
 	for fkey, attr in mesh.faces(data=True):
@@ -244,10 +251,85 @@ def faces_angles(mesh, vector_tag, ref_vector):
 
 	return angles
 
-# ==============================================================================
-# Compute loss
-# ==============================================================================
 
+def vector_from_angle(angle, base_vector=[1.0, 0.0, 0.0]):
+
+	rot_pts = rotate_points([base_vector], math.radians(angle))
+	return rot_pts[0]
+
+
+def vectors_from_angles(angles, base_vector=[1.0, 0.0, 0.0]):
+
+	vectors = {}
+	
+	for fkey, angle in angles.items():
+		rot_pts = rotate_points([base_vector], math.radians(angle))
+		vectors[fkey] = vector_from_angle(angle, base_vector)
+
+	return vectors
+
+
+def plot_colored_vectors(angles, base_vector=[1.0, 0.0, 0.0]):
+
+	vectors = vectors_from_angles(angles, base_vector)
+
+	X = np.array(list(vectors.values()))
+	x = X[:, 0]
+	y = X[:, 1]
+
+	c = np.array(list(kcolors.values())).reshape((-1, 3)) / 255.0
+
+	plt.scatter(x, y, c=c.tolist())
+	plt.show()
+
+
+def cluster_center_vectors(mesh, centers, cluster_labels, base_vector=[1.0, 1.0, 0.0], length=1.0):
+
+	center_vectors = []
+	for center in centers:
+
+		angle = center
+
+		centroids = []
+		for fkey, label in cluster_labels.items():
+			if label != center:
+				continue
+			centroids.append(mesh.face_centroid(fkey))
+
+		cluster_centroid = centroid_points(centroids)
+		vec = vector_from_angle(angle, base_vector)	
+		
+		for sign in (-1, 1):
+
+			a = vector_from_angle(sign * 45.0, vec)
+			arrow = line_sdl(cluster_centroid, a, length, both_sides=False)
+
+			center_vectors.append(arrow)
+
+	return center_vectors
+
+
+def cluster_arrows(arrows, width=1.0, color=None):
+
+	arrows = list(map(line_tuple_to_dict, arrows))
+	for arrow in arrows:
+		arrow['width'] = width
+		if color:
+			arrow['color'] = color
+
+	return arrows
+
+
+def faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 1.0, 0.0]):
+
+	for fkey, label in cluster_labels.items():
+		angle = label[0]
+
+		vec = vector_from_angle(angle, base_vector)
+	
+		for sign, tag in zip((-1, 1), tags):
+			rotvec = vector_from_angle(sign * 45.0, vec)
+			mesh.face_attribute(fkey, name=tag, value=rotvec)
 
 
 if __name__ == '__main__':
@@ -257,13 +339,13 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	HERE = '../data/json_files/four_point_slab.json'  # interesting
-	# HERE = '../data/json_files/perimeter_supported_slab.json' # interesting
-	# HERE = '../data/json_files/topleft_supported_slab.json'  # interesting
+	HERE = '../data/json_files/perimeter_supported_slab.json' # interesting
+	# HERE = '../data/json_files/topleft_supported_slab.json'  # interesting
 
-	# HERE = '../data/json_files/leftright_supported_slab.json'  # interesting
+	# HERE = '../data/json_files/leftright_supported_slab.json'  # interesting
 
 	# HERE = '../data/json_files/bottomleftright_supported_slab.json'  
-	# HERE = '../data/json_files/middle_supported_slab_cantilever.json'
+	# HERE = '../data/json_files/middle_supported_slab_cantilever.json'
 
 	tags = [
 		'n_1',
@@ -282,13 +364,20 @@ if __name__ == '__main__':
 
 	vector_tag = 'ps_1_top'
 	bisec_vector_tag = 'ps_12_top'
-	vector_tag_display = 'ps_1_top'
+	cluster_vector_tags = ['ps_1_top_cluster', 'ps_2_top_cluster']
+
+	vector_display_tags = ['ps_1_top', 'ps_2_top']
+	vector_display_tags = cluster_vector_tags
+
+	vector_display_colors = [(50, 50, 50), (50, 50, 50)]
 
 	smooth_iters = 20
 	n_clusters = 3
 
 	draw_vector_field = True
 	draw_contours = True
+	draw_kmeans_colors = False  # 2d representation
+	draw_arrows = False
 
 	# ==========================================================================
 	# Import mesh
@@ -316,13 +405,12 @@ if __name__ == '__main__':
 	smoothed_angles(angles, smooth_iters)
 
 	# ==========================================================================
-	# Kmeans
+	# Kmeans angles
 	# ==========================================================================
 
-	colors = rgb_colors(angles)
-	# labels, centers = cluster(colors, n_clusters)
-
 	labels, centers = cluster(angles, n_clusters, reshape=(-1, 1))
+	print('centers')
+	print(centers)
 
 	# ==========================================================================
 	# Quantized Colors
@@ -332,13 +420,27 @@ if __name__ == '__main__':
 	kcolors = rgb_colors(cluster_labels)
 
 	# ==========================================================================
+	# Register clustered field
+	# ==========================================================================
+
+	tags = cluster_vector_tags
+	faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 1.0, 0.0])
+
+	# ==========================================================================
+	# Kmeans plot 2d
+	# ==========================================================================
+
+	if draw_kmeans_colors:
+		plot_colored_vectors(angles, base_vector=[1.0, 0.0, 0.0])
+
+	# ==========================================================================
 	# Set up Plotter
 	# ==========================================================================
 
 	plotter = MeshPlotter(mesh, figsize=(12, 9))
 	plotter.draw_edges(keys=list(mesh.edges_on_boundary()))
 	plotter.draw_faces(facecolor=kcolors)
-
+	
 	# ==========================================================================
 	# Scalar Contouring
 	# ==========================================================================
@@ -352,12 +454,30 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	if draw_vector_field:
-		lines = vector_lines_on_faces(mesh, vector_tag_display, True, factor=0.05)
-		lines = [line for line in map(line_tuple_to_dict, lines)]
-		for line in lines:
-			line['width'] = 0.60
+
+		lines = []
+		length = 0.05
+
+		for vector_display_tag, c in zip(vector_display_tags, vector_display_colors):
+			_lines = vector_lines_on_faces(mesh, vector_display_tag, True, factor=length)
+			_lines = [line for line in map(line_tuple_to_dict, _lines)]
+
+			for line in _lines:
+				line['width'] = 0.5
+				line['color'] = c
+
+			lines.extend(_lines)
 
 		plotter.draw_lines(lines)
+
+	# ==========================================================================
+	# Draw cluster arrows
+	# ==========================================================================
+
+	if draw_arrows:
+		center_vecs = cluster_center_vectors(mesh, centers, cluster_labels, length=0.2)
+		arrows = cluster_arrows(center_vecs, width=1.0, color=None)
+		plotter.draw_arrows(arrows)
 
 	# ==========================================================================
 	# Show
