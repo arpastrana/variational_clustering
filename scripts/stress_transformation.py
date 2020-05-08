@@ -338,7 +338,7 @@ def faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 1.0, 0.0
 
 
 def transformed_forces(fx, fy, fxy, angle):
-	theta = math.radians(angle)
+	theta = angle
 
 	tfx = (fx + fy) / 2 + (fx - fy) * math.cos(2 * theta) / 2 + fxy * math.sin(2 * theta)
 	tfy = fx + fy - tfx
@@ -358,9 +358,9 @@ def principal_forces(fx, fy, fxy):
 def principal_angles(fx, fy, fxy):
 
 	a = 2 * fxy / (fx - fy)
-	b = math.degrees(math.atan(a) / 2)
+	b = math.atan(a) / 2
 	
-	return b, b + 90.0
+	return b, b + math.radians(90.0)
 
 
 def align_principal_forces_angles(forces, pforces, pangles, tol=0.001):
@@ -375,6 +375,19 @@ def align_principal_forces_angles(forces, pforces, pangles, tol=0.001):
 	return pf2, pf1
 
 
+def aligned_principal_angles(forces, tol=0.01):
+	fx, fy, fxy = forces
+
+	a1, a2 = principal_angles(fx, fy, fxy)
+	pf1, pf2 = principal_forces(fx, fy, fxy)
+	tf1, tf2, _ = transformed_forces(fx, fy, fxy, a1)
+
+	if math.fabs(tf1 - pf1) < tol:
+		return a1, a2
+
+	return a2, a1
+
+
 if __name__ == '__main__':
 
 	# ==========================================================================
@@ -382,7 +395,7 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	HERE = '../data/json_files/four_point_slab_full.json'  # interesting
-	# HERE = '../data/json_files/four_point_slab.json'  # interesting
+	# HERE = '../data/json_files/four_point_slab.json'  # interesting
 	# HERE = '../data/json_files/perimeter_supported_slab.json' # interesting
 	# HERE = '../data/json_files/topleft_supported_slab.json'  # interesting
 
@@ -426,7 +439,7 @@ if __name__ == '__main__':
 
 	vector_display_colors = [(50, 50, 50), (50, 50, 50)]
 
-	smooth_iters = 20
+	smooth_iters = 2
 	n_clusters = 3
 
 	fck = 40.0
@@ -481,23 +494,23 @@ if __name__ == '__main__':
 		ref_prin_moments[fkey] = karamba_moments
 
 		pforces = principal_forces(*forces)
-		pangles = principal_angles(*forces)
+		# pangles = principal_angles(*forces)
+		pangles = aligned_principal_angles(forces, tol=0.01)
 
 		# karamba doesn't re-align the forces, apparently
-		pforces = align_principal_forces_angles(forces, pforces, pangles)
+		# pforces = align_principal_forces_angles(forces, pforces, pangles)
 
-
-		pangle = min(pangles) 
+		# pangle = min(pangles) 
+		pangle = pangles[0]
 		angle = angles[fkey]
 
-		assert math.fabs(angle - math.fabs(pangle)) < 0.01
+		# print('pangles', [math.degrees(x) for x in pangles], angle)
+		# msg = "{} vs. {}".format(math.fabs(math.degrees(pangle)), angle)
+		# assert math.fabs(angle - math.fabs(math.degrees(pangle))) < 0.01, msg
 
 		prin_angles[fkey] = pangle
-
 		prin_moments[fkey] = pforces
-
 		ref_moments[fkey] = forces
-
 		sign_angles[fkey] = math.copysign(1.0, pangle)
 
 	# ==========================================================================
@@ -506,9 +519,9 @@ if __name__ == '__main__':
 
 	smoothed_angles(angles, smooth_iters)
 
-	# # ==========================================================================
-	# # Kmeans angles
-	# # ==========================================================================
+	# ==========================================================================
+	# Kmeans angles
+	# ==========================================================================
 
 	labels, centers = cluster(angles, n_clusters, reshape=(-1, 1))
 	print('centers')
@@ -521,9 +534,9 @@ if __name__ == '__main__':
 	cluster_labels = faces_labels(labels, centers)
 	kcolors = rgb_colors(cluster_labels)
 
-	# # ==========================================================================
-	# # Register clustered field
-	# # ==========================================================================
+	# ==========================================================================
+	# Register clustered field
+	# ==========================================================================
 
 	# tags = cluster_vector_tags
 	# faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 1.0, 0.0])
@@ -545,17 +558,49 @@ if __name__ == '__main__':
 
 
 	angles = cluster_labels
+	collector = []
+	design_angles = {k: v for k, v in angles.items()}
 	for fkey in angles.keys():
-		angles[fkey] *= sign_angles[fkey]
+		print()
+		temp = prin_angles[fkey]
+		a = math.radians(design_angles[fkey])
+
+		# check before all this what is the maximum difference in radians
+
+		print(temp, a)
+
+		a *= sign_angles[fkey]
+
+		print(temp, a)
+
+		if temp - a > 1.2:
+			a += math.radians(90.0)
+
+		print(temp, a)
+	
+		if math.fabs(a - temp) > 1.2:  # 0.10
+			print('flag!', fkey, a, temp)
+			collector.append(math.fabs(a - temp))
+
+		design_angles[fkey] = a
+
+
+	print()
+	print('total collected', len(collector))
+	try:
+		print(max(collector))
+	except:
+		pass
+	
+	print()
 
 
 	# design_moments = ref_moments  # ortho
-	# design_moments = prin_moments # computed moments
+	# design_moments = prin_moments # computed moments
 	# design_moments = ref_prin_moments  # karamba
 	
-	# pring_angles = {k: v - 90.0 for k, v in prin_angles.items()}
-	design_moments = compute_design_moments(mesh, ref_moments, prin_angles)  # princ moments
-	design_moments = compute_design_moments(mesh, ref_moments, angles)  # custom angles
+	# design_moments = compute_design_moments(mesh, ref_moments, prin_angles)  # princ moments
+	design_moments = compute_design_moments(mesh, ref_moments, design_angles)  # custom angles
 
 	# ==========================================================================
 	# Sandwich definition
