@@ -163,7 +163,8 @@ if __name__ == '__main__':
 	'../data/json_files/topleft_supported_slab.json',  # interesting
 	'../data/json_files/leftright_supported_slab.json',  # interesting
 	'../data/json_files/bottomleftright_supported_slab.json' , 
-	'../data/json_files/middle_supported_slab_cantilever.json'
+	'../data/json_files/middle_supported_slab_cantilever.json',
+	'../data/json_files/triangle_supported_slab_cantilever.json'
 	]
 
 	vector_tag = 'ps_1_top'  # ps_1_top

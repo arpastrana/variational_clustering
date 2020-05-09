@@ -339,7 +339,7 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	HERE = '../data/json_files/four_point_slab.json'  # interesting
-	HERE = '../data/json_files/perimeter_supported_slab.json' # interesting
+	# HERE = '../data/json_files/perimeter_supported_slab.json' # interesting
 	# HERE = '../data/json_files/topleft_supported_slab.json'  # interesting
 
 	# HERE = '../data/json_files/leftright_supported_slab.json'  # interesting
@@ -367,15 +367,15 @@ if __name__ == '__main__':
 	cluster_vector_tags = ['ps_1_top_cluster', 'ps_2_top_cluster']
 
 	vector_display_tags = ['ps_1_top', 'ps_2_top']
-	vector_display_tags = cluster_vector_tags
+	# vector_display_tags = cluster_vector_tags
 
 	vector_display_colors = [(50, 50, 50), (50, 50, 50)]
 
-	smooth_iters = 16
+	smooth_iters = 20
 	n_clusters = 3
 
 	draw_vector_field = True
-	draw_contours = True
+	draw_contours = False
 	draw_kmeans_colors = False  # 2d representation
 	draw_arrows = False
 
@@ -439,7 +439,8 @@ if __name__ == '__main__':
 
 	plotter = MeshPlotter(mesh, figsize=(12, 9))
 	plotter.draw_edges(keys=list(mesh.edges_on_boundary()))
-	plotter.draw_faces(facecolor=kcolors)
+	# plotter.draw_faces(facecolor=kcolors)
+	plotter.draw_faces()
 	
 	# ==========================================================================
 	# Scalar Contouring
@@ -456,14 +457,14 @@ if __name__ == '__main__':
 	if draw_vector_field:
 
 		lines = []
-		length = 0.05
+		length = 0.05  # 0.10
 
 		for vector_display_tag, c in zip(vector_display_tags, vector_display_colors):
 			_lines = vector_lines_on_faces(mesh, vector_display_tag, True, factor=length)
 			_lines = [line for line in map(line_tuple_to_dict, _lines)]
 
 			for line in _lines:
-				line['width'] = 0.5
+				line['width'] = 0.5  # 1.0
 				line['color'] = c
 
 			lines.extend(_lines)

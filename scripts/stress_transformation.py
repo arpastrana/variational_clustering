@@ -133,7 +133,7 @@ def contour_polygons(mesh, centers, face_labels, density=100, method='nearest'):
 	for fkey in mesh.faces():
 		point = mesh.face_centroid(fkey)[:2]
 		xy.append(point)
-		a = face_labels[fkey][0]
+		a = face_labels[fkey]
 		s.append(a)
 
 	b = np.sort(centers, axis=0).flatten()
@@ -157,6 +157,19 @@ def rgb_colors(data):
 	colors = {}
 	for idx, value in data.items():
 		colors[idx] = i_to_rgb(value / valuemax)  # tuple 0-255
+
+	return colors
+
+
+def black_colors(data):
+
+	assert isinstance(data, dict)
+
+	valuemax = np.amax(np.array(list(data.values())))
+
+	colors = {}
+	for idx, value in data.items():
+		colors[idx] = i_to_black(value / valuemax)  # tuple 0-255
 
 	return colors
 
@@ -328,7 +341,7 @@ def cluster_arrows(arrows, width=1.0, color=None):
 def faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 1.0, 0.0]):
 
 	for fkey, label in cluster_labels.items():
-		angle = label[0]
+		angle = label
 
 		vec = vector_from_angle(angle, base_vector)
 	
@@ -363,18 +376,6 @@ def principal_angles(fx, fy, fxy):
 	return b, b + math.radians(90.0)
 
 
-def align_principal_forces_angles(forces, pforces, pangles, tol=0.001):
-	fx, fy, fxy = forces
-	pf1, pf2 = pforces
-	a1, a2 = pangles
-
-	x, y, xy = transformed_forces(fx, fy, fxy, a1)
-	if math.fabs(x - pf1) < tol:
-		return pf1, pf2
-
-	return pf2, pf1
-
-
 def aligned_principal_angles(forces, tol=0.01):
 	fx, fy, fxy = forces
 
@@ -382,10 +383,22 @@ def aligned_principal_angles(forces, tol=0.01):
 	pf1, pf2 = principal_forces(fx, fy, fxy)
 	tf1, tf2, _ = transformed_forces(fx, fy, fxy, a1)
 
-	if math.fabs(tf1 - pf1) < tol:
+	if math.fabs(math.fabs(tf1) - math.fabs(pf1)) < tol:
 		return a1, a2
 
 	return a2, a1
+
+
+def compute_design_moments(mesh, refmoments, angles):
+
+	transformed = {}
+	for fkey in mesh.faces():
+		mx, my, mxy = refmoments[fkey]
+		angle = angles[fkey]
+		t_moments = transformed_forces(mx, my, mxy, angle)
+		transformed[fkey] = t_moments
+
+	return transformed
 
 
 if __name__ == '__main__':
@@ -394,15 +407,16 @@ if __name__ == '__main__':
 	# Constants
 	# ==========================================================================
 
-	HERE = '../data/json_files/four_point_slab_full.json'  # interesting
-	# HERE = '../data/json_files/four_point_slab.json'  # interesting
-	# HERE = '../data/json_files/perimeter_supported_slab.json' # interesting
-	# HERE = '../data/json_files/topleft_supported_slab.json'  # interesting
+	# HERE = '../data/json_files/four_point_slab'  # interesting
+	# HERE = '../data/json_files/perimeter_supported_slab' # interesting
+	HERE = '../data/json_files/topleft_supported_slab'  # interesting
 
-	# HERE = '../data/json_files/leftright_supported_slab.json'  # interesting
+	# HERE = '../data/json_files/leftright_supported_slab'  # interesting
 
-	# HERE = '../data/json_files/bottomleftright_supported_slab.json'  
-	# HERE = '../data/json_files/middle_supported_slab_cantilever.json'
+	# HERE = '../data/json_files/bottomleftright_supported_slab'  
+
+	# HERE = '../data/json_files/middle_supported_slab_cantilever'
+	# HERE = '../data/json_files/triangle_supported_slab_cantilever'
 
 	tags = [
 		'n_1',
@@ -430,7 +444,8 @@ if __name__ == '__main__':
 		'vy'
 		]
 
-	vector_tag = 'ps_1_top_a'
+
+	vector_tag = 'ps_1_top'
 	bisec_vector_tag = 'ps_12_top'
 	cluster_vector_tags = ['ps_1_top_cluster', 'ps_2_top_cluster']
 
@@ -439,26 +454,33 @@ if __name__ == '__main__':
 
 	vector_display_colors = [(50, 50, 50), (50, 50, 50)]
 
-	smooth_iters = 2
-	n_clusters = 3
+	smooth_iters = 0
+	n_clusters = 1
+
+	data_to_color_tag = "clusters"  # steel_mass, clusters
+
+	design_set = "ortho"  # ortho, ps, k
+
+
+	steel_tag = "asyt"  # (asxb, asyb, asxt)
+	
+	draw_contours = True
+	draw_vector_field = True
+	draw_kmeans_colors = False  # 2d representation
+	draw_arrows = False
+	export_json = False
 
 	fck = 40.0
 	fy = 500.0
 	cover = 0.05  # m
 	shell_thickness = 0.15  # m
-	ftcd_factor = 10
-
-
-	draw_vector_field = True
-	draw_contours = True
-	draw_kmeans_colors = False  # 2d representation
-	draw_arrows = False
+	ftcd_factor = 100
 
 	# ==========================================================================
 	# Import mesh
 	# ==========================================================================
 
-	mesh = Mesh.from_json(HERE)
+	mesh = Mesh.from_json(HERE + ".json")
 	mesh_unify_cycles(mesh)
 
 	# ==========================================================================
@@ -478,40 +500,27 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	moment_tags = ["mx", "my", "mxy"]
-	ref_moment_tags = ["m_1_val", "m_2_val"]
+	ref_moment_tags = ["m_1", "m_2"]
 
 	prin_angles = {}
-	prin_moments = {}
 	ref_moments = {}
-	ref_prin_moments = {}
-	sign_angles = {}
-
+	delta_angles = {}
 
 	for fkey in mesh.faces():		
 		forces = mesh.face_attributes(fkey, names=moment_tags)
 
 		karamba_moments = mesh.face_attributes(fkey, names=ref_moment_tags)
-		ref_prin_moments[fkey] = karamba_moments
 
 		pforces = principal_forces(*forces)
-		# pangles = principal_angles(*forces)
 		pangles = aligned_principal_angles(forces, tol=0.01)
 
-		# karamba doesn't re-align the forces, apparently
-		# pforces = align_principal_forces_angles(forces, pforces, pangles)
-
-		# pangle = min(pangles) 
 		pangle = pangles[0]
 		angle = angles[fkey]
 
-		# print('pangles', [math.degrees(x) for x in pangles], angle)
-		# msg = "{} vs. {}".format(math.fabs(math.degrees(pangle)), angle)
-		# assert math.fabs(angle - math.fabs(math.degrees(pangle))) < 0.01, msg
-
 		prin_angles[fkey] = pangle
-		prin_moments[fkey] = pforces
 		ref_moments[fkey] = forces
-		sign_angles[fkey] = math.copysign(1.0, pangle)
+		delta_angles[fkey] = pangle - math.radians(angle)
+
 
 	# ==========================================================================
 	# Average smooth angles
@@ -524,6 +533,7 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	labels, centers = cluster(angles, n_clusters, reshape=(-1, 1))
+
 	print('centers')
 	print(centers)
 
@@ -532,75 +542,38 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	cluster_labels = faces_labels(labels, centers)
-	kcolors = rgb_colors(cluster_labels)
+
+	for fkey, label in cluster_labels.items():
+		mesh.face_attribute(fkey, name="k_label", value=label)
 
 	# ==========================================================================
 	# Register clustered field
 	# ==========================================================================
 
-	# tags = cluster_vector_tags
-	# faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 1.0, 0.0])
+	tags = cluster_vector_tags
+	faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 1.0, 0.0])
 
 	# ==========================================================================
 	# Transform forces for design
 	# ==========================================================================
 
-	def compute_design_moments(mesh, refmoments, angles):
+	design_angles = {k: v for k, v in cluster_labels.items()}
+	threshold = math.radians(45.0)
 
-		transformed = {}
-		for fkey in mesh.faces():
-			mx, my, mxy = refmoments[fkey]
-			angle = angles[fkey]
-			t_moments = transformed_forces(mx, my, mxy, angle)
-			transformed[fkey] = t_moments
-
-		return transformed
-
-
-	angles = cluster_labels
-	collector = []
-	design_angles = {k: v for k, v in angles.items()}
 	for fkey in angles.keys():
-		print()
 		temp = prin_angles[fkey]
 		a = math.radians(design_angles[fkey])
-
-		# check before all this what is the maximum difference in radians
-
-		print(temp, a)
-
-		a *= sign_angles[fkey]
-
-		print(temp, a)
-
-		if temp - a > 1.2:
-			a += math.radians(90.0)
-
-		print(temp, a)
-	
-		if math.fabs(a - temp) > 1.2:  # 0.10
-			print('flag!', fkey, a, temp)
-			collector.append(math.fabs(a - temp))
-
+		a += delta_angles[fkey]		
 		design_angles[fkey] = a
 
 
-	print()
-	print('total collected', len(collector))
-	try:
-		print(max(collector))
-	except:
-		pass
-	
-	print()
+	design_moments_set = {
+			"ortho": ref_moments,
+			"ps": compute_design_moments(mesh, ref_moments, prin_angles),
+			"k": compute_design_moments(mesh, ref_moments, design_angles)
+			}
 
-
-	# design_moments = ref_moments  # ortho
-	# design_moments = prin_moments # computed moments
-	# design_moments = ref_prin_moments  # karamba
-	
-	# design_moments = compute_design_moments(mesh, ref_moments, prin_angles)  # princ moments
-	design_moments = compute_design_moments(mesh, ref_moments, design_angles)  # custom angles
+	design_moments = design_moments_set[design_set]
 
 	# ==========================================================================
 	# Sandwich definition
@@ -654,65 +627,83 @@ if __name__ == '__main__':
 			steel_massing[tag][fkey] = mass
 			steel_tags[tag] +=mass
 
+	print()
 	for k, v in steel_tags.items():
 		print(k, v)
 
-	# # ==========================================================================
-	# # Kmeans plot 2d
-	# # ==========================================================================
+	# ==========================================================================
+	# data to plot
+	# ==========================================================================
 
-	# if draw_kmeans_colors:
-	# 	plot_colored_vectors(angles, base_vector=[1.0, 0.0, 0.0])
-
-	# # ==========================================================================
-	# # Set up Plotter
-	# # ==========================================================================
-
-	# plotter = MeshPlotter(mesh, figsize=(12, 9))
-	# plotter.draw_edges(keys=list(mesh.edges_on_boundary()))
-	# plotter.draw_faces(facecolor=kcolors)
+	data_to_color = {
+		"clusters": rgb_colors(cluster_labels),
+		"steel_mass": black_colors({fkey: steel_massing[steel_tag][fkey] for fkey in mesh.faces()})
+		}
 	
-	# # ==========================================================================
-	# # Scalar Contouring
-	# # ==========================================================================
-
-	# if draw_contours:
-	# 	polygons = contour_polygons(mesh, centers, cluster_labels, 100, 'nearest')
-	# 	plotter.draw_polylines(polygons)
-
-	# # ==========================================================================
-	# # Create PS vector lines
-	# # ==========================================================================
-
-	# if draw_vector_field:
-
-	# 	lines = []
-	# 	length = 0.05
-
-	# 	for vector_display_tag, c in zip(vector_display_tags, vector_display_colors):
-	# 		_lines = vector_lines_on_faces(mesh, vector_display_tag, True, factor=length)
-	# 		_lines = [line for line in map(line_tuple_to_dict, _lines)]
-
-	# 		for line in _lines:
-	# 			line['width'] = 0.5
-	# 			line['color'] = c
-
-	# 		lines.extend(_lines)
-
-	# 	plotter.draw_lines(lines)
-	# 	# plotter.draw_arrows(lines)
-
-	# # ==========================================================================
-	# # Draw cluster arrows
-	# # ==========================================================================
-
-	# if draw_arrows:
-	# 	center_vecs = cluster_center_vectors(mesh, centers, cluster_labels, length=0.2)
-	# 	arrows = cluster_arrows(center_vecs, width=1.0, color=None)
-	# 	plotter.draw_arrows(arrows)
-
-	# # ==========================================================================
-	# # Show
-	# # ==========================================================================
+	datacolors = data_to_color[data_to_color_tag]
 	
-	# plotter.show()
+	# ==========================================================================
+	# Kmeans plot 2d
+	# ==========================================================================
+
+	if draw_kmeans_colors:
+		plot_colored_vectors(angles, base_vector=[1.0, 0.0, 0.0])
+
+	# ==========================================================================
+	# Set up Plotter
+	# ==========================================================================
+
+	plotter = MeshPlotter(mesh, figsize=(12, 9))
+	plotter.draw_edges(keys=list(mesh.edges_on_boundary()))
+	plotter.draw_faces(facecolor=datacolors)
+	
+	# ==========================================================================
+	# Scalar Contouring
+	# ==========================================================================
+
+	if draw_contours:
+		polygons = contour_polygons(mesh, centers, cluster_labels, 100, 'nearest')
+		plotter.draw_polylines(polygons)
+
+	# ==========================================================================
+	# Create PS vector lines
+	# ==========================================================================
+
+	if draw_vector_field:
+
+		lines = []
+		length = 0.05
+
+		for vector_display_tag, c in zip(vector_display_tags, vector_display_colors):
+			_lines = vector_lines_on_faces(mesh, vector_display_tag, True, factor=length)
+			_lines = [line for line in map(line_tuple_to_dict, _lines)]
+
+			for line in _lines:
+				line['width'] = 0.5
+				line['color'] = c
+
+			lines.extend(_lines)
+
+		plotter.draw_lines(lines)
+
+	# ==========================================================================
+	# Draw cluster arrows
+	# ==========================================================================
+
+	if draw_arrows:
+		center_vecs = cluster_center_vectors(mesh, centers, cluster_labels, length=0.2)
+		arrows = cluster_arrows(center_vecs, width=1.0, color=None)
+		plotter.draw_arrows(arrows)
+
+	# ==========================================================================
+	# Export json
+	# ==========================================================================
+
+	if export_json:
+		mesh.to_json(HERE + "_k_{}_smooth_{}.json".format(n_clusters, smooth_iters))
+
+	# ==========================================================================
+	# Show
+	# ==========================================================================
+	
+	plotter.show()
