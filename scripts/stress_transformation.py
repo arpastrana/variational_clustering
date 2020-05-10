@@ -148,7 +148,7 @@ def contour_polygons(mesh, centers, face_labels, density=100, method='nearest'):
 	return polygons
 
 
-def rgb_colors(data):
+def color_maker(data, callback, invert=False):
 
 	assert isinstance(data, dict)
 
@@ -156,22 +156,25 @@ def rgb_colors(data):
 
 	colors = {}
 	for idx, value in data.items():
-		colors[idx] = i_to_rgb(value / valuemax)  # tuple 0-255
+		if not invert:
+			ratio = value / valuemax  # tuple 0-255
+		else:
+			ratio = (valuemax - value) / valuemax
+
+		colors[idx] = callback(ratio)  # tuple 0-255
 
 	return colors
 
+def rgb_colors(data, invert=False):
+	return color_maker(data, i_to_rgb, invert)
 
-def black_colors(data):
 
-	assert isinstance(data, dict)
+def black_colors(data, invert=False):
+	return color_maker(data, i_to_black, invert)
 
-	valuemax = np.amax(np.array(list(data.values())))
 
-	colors = {}
-	for idx, value in data.items():
-		colors[idx] = i_to_black(value / valuemax)  # tuple 0-255
-
-	return colors
+def inverted_blue_colors(data, invert=True):
+	return color_maker(data, i_to_blue, invert)
 
 
 def cluster(data, n_clusters, reshape=None, normalize=False, random_state=0, n_jobs=-1):
@@ -401,6 +404,10 @@ def compute_design_moments(mesh, refmoments, angles):
 	return transformed
 
 
+def bar_area(diameter):
+	return (math.pi * bar_diameter ** 2) / 4.0
+
+
 if __name__ == '__main__':
 
 	# ==========================================================================
@@ -416,7 +423,7 @@ if __name__ == '__main__':
 	# HERE = '../data/json_files/bottomleftright_supported_slab'  
 
 	# HERE = '../data/json_files/middle_supported_slab_cantilever'
-	# HERE = '../data/json_files/triangle_supported_slab_cantilever'
+	# HERE = '../data/json_files/triangle_supported_slab_cantilever'
 
 	tags = [
 		'n_1',
@@ -454,27 +461,32 @@ if __name__ == '__main__':
 
 	vector_display_colors = [(50, 50, 50), (50, 50, 50)]
 
-	smooth_iters = 0
-	n_clusters = 1
+	smooth_iters = 10
+	n_clusters = 3
 
-	data_to_color_tag = "clusters"  # steel_mass, clusters
+	data_to_color_tag = "mass"  # clusters, mass, spacings
 
-	design_set = "ortho"  # ortho, ps, k
+	design_set = "k"  # ortho, ps, k
 
-
-	steel_tag = "asyt"  # (asxb, asyb, asxt)
+	steel_tag = "asxb"
 	
 	draw_contours = True
 	draw_vector_field = True
 	draw_kmeans_colors = False  # 2d representation
 	draw_arrows = False
+
+	plot_mesh = True
+
 	export_json = False
 
 	fck = 40.0
 	fy = 500.0
 	cover = 0.05  # m
 	shell_thickness = 0.15  # m
-	ftcd_factor = 100
+	ftcd_factor = 10
+
+	bar_diameter = 1.2   # cm
+	max_spacing = 0.40  # m
 
 	# ==========================================================================
 	# Import mesh
@@ -628,8 +640,48 @@ if __name__ == '__main__':
 			steel_tags[tag] +=mass
 
 	print()
+	print("masses")
 	for k, v in steel_tags.items():
 		print(k, v)
+
+	print()
+	for k, v in steel_massing.items():
+		massing = list(v.values())
+		print(k, " ", "min mass", min(massing), "max mass", max(massing))
+
+	# ==========================================================================
+	# Mat spacings
+	# ==========================================================================
+
+	steel_spacing = {tag: {} for tag in steel_tags.keys()}
+
+	area = bar_area(bar_diameter)
+	for tag, steel_mass in steel_massing.items():
+		for fkey, steel_req in steel_mass.items():
+
+			tol = 1e-6
+			if steel_req < tol:
+				steel_spacing[tag][fkey] = -1.0
+				continue
+
+			num_bars = steel_req / area
+			spacing = 1 / num_bars
+
+			if spacing > max_spacing:
+				spacing = max_spacing
+
+			steel_spacing[tag][fkey] = spacing
+
+
+	print()
+	print("spacings")
+	for k, v in steel_spacing.items():
+		spacings = np.array([v for v in v.values() if v != -1.0])
+		try:
+			print(k, " ", "min", np.amin(spacings), "max", np.amax(spacings), "mean", \
+			      np.mean(spacings), "median", np.median(spacings))
+		except ValueError:
+			pass
 
 	# ==========================================================================
 	# data to plot
@@ -637,7 +689,8 @@ if __name__ == '__main__':
 
 	data_to_color = {
 		"clusters": rgb_colors(cluster_labels),
-		"steel_mass": black_colors({fkey: steel_massing[steel_tag][fkey] for fkey in mesh.faces()})
+		"mass": rgb_colors({fkey: steel_massing[steel_tag][fkey] for fkey in mesh.faces()}),
+		"spacings": rgb_colors({fkey: steel_spacing[steel_tag][fkey] for fkey in mesh.faces()}, invert=True)
 		}
 	
 	datacolors = data_to_color[data_to_color_tag]
@@ -705,5 +758,6 @@ if __name__ == '__main__':
 	# ==========================================================================
 	# Show
 	# ==========================================================================
-	
-	plotter.show()
+
+	if plot_mesh:
+		plotter.show()
