@@ -415,8 +415,8 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	# HERE = '../data/json_files/four_point_slab'  # interesting
-	# HERE = '../data/json_files/perimeter_supported_slab' # interesting
-	HERE = '../data/json_files/topleft_supported_slab'  # interesting
+	HERE = '../data/json_files/perimeter_supported_slab' # interesting
+	# HERE = '../data/json_files/topleft_supported_slab'  # interesting
 
 	# HERE = '../data/json_files/leftright_supported_slab'  # interesting
 
@@ -464,11 +464,11 @@ if __name__ == '__main__':
 	smooth_iters = 10
 	n_clusters = 3
 
-	data_to_color_tag = "mass"  # clusters, mass, spacings
+	data_to_color_tag = "spacings"  # clusters, mass, spacings
 
-	design_set = "k"  # ortho, ps, k
+	design_set = "ortho"  # ortho, ps, k
 
-	steel_tag = "asxb"
+	steel_tag = "asyb"
 	
 	draw_contours = True
 	draw_vector_field = True
@@ -485,7 +485,7 @@ if __name__ == '__main__':
 	shell_thickness = 0.15  # m
 	ftcd_factor = 10
 
-	bar_diameter = 1.2   # cm
+	bar_diameter = 0.8   # cm
 	max_spacing = 0.40  # m
 
 	# ==========================================================================
@@ -661,7 +661,7 @@ if __name__ == '__main__':
 
 			tol = 1e-6
 			if steel_req < tol:
-				steel_spacing[tag][fkey] = -1.0
+				steel_spacing[tag][fkey] = max_spacing
 				continue
 
 			num_bars = steel_req / area
