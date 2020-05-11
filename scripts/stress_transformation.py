@@ -415,15 +415,15 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	# HERE = '../data/json_files/four_point_slab'  # interesting
-	HERE = '../data/json_files/perimeter_supported_slab' # interesting
+	# HERE = '../data/json_files/perimeter_supported_slab' # interesting
 	# HERE = '../data/json_files/topleft_supported_slab'  # interesting
 
 	# HERE = '../data/json_files/leftright_supported_slab'  # interesting
 
-	# HERE = '../data/json_files/bottomleftright_supported_slab'  
+	HERE = '../data/json_files/bottomleftright_supported_slab'  
 
-	# HERE = '../data/json_files/middle_supported_slab_cantilever'
-	# HERE = '../data/json_files/triangle_supported_slab_cantilever'
+	HERE = '../data/json_files/middle_supported_slab_cantilever'
+	# HERE = '../data/json_files/triangle_supported_slab_cantilever'  # interesting
 
 	tags = [
 		'n_1',
@@ -461,23 +461,23 @@ if __name__ == '__main__':
 
 	vector_display_colors = [(50, 50, 50), (50, 50, 50)]
 
-	smooth_iters = 10
-	n_clusters = 3
+	smooth_iters = 20
+	n_clusters = 2
 
-	data_to_color_tag = "spacings"  # clusters, mass, spacings
+	data_to_color_tag = "clusters"  # angles, clusters, mass, spacings
 
 	design_set = "ortho"  # ortho, ps, k
 
 	steel_tag = "asyb"
 	
-	draw_contours = True
-	draw_vector_field = True
+	draw_contours = False
+	draw_vector_field = False
 	draw_kmeans_colors = False  # 2d representation
 	draw_arrows = False
 
 	plot_mesh = True
 
-	export_json = False
+	export_json = True
 
 	fck = 40.0
 	fy = 500.0
@@ -690,7 +690,8 @@ if __name__ == '__main__':
 	data_to_color = {
 		"clusters": rgb_colors(cluster_labels),
 		"mass": rgb_colors({fkey: steel_massing[steel_tag][fkey] for fkey in mesh.faces()}),
-		"spacings": rgb_colors({fkey: steel_spacing[steel_tag][fkey] for fkey in mesh.faces()}, invert=True)
+		"spacings": rgb_colors({fkey: steel_spacing[steel_tag][fkey] for fkey in mesh.faces()}, invert=True),
+		"angles": rgb_colors(angles)
 		}
 	
 	datacolors = data_to_color[data_to_color_tag]
@@ -753,7 +754,9 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	if export_json:
-		mesh.to_json(HERE + "_k_{}_smooth_{}.json".format(n_clusters, smooth_iters))
+		out = HERE + "_k_{}_smooth_{}.json".format(n_clusters, smooth_iters)
+		mesh.to_json(out)
+		print("Exported mesh to: {}".format(out))
 
 	# ==========================================================================
 	# Show
