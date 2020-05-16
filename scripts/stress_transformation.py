@@ -214,20 +214,6 @@ def faces_labels(labels, centers):
 	return face_labels
 
 
-def faces_bisector_field_old(mesh, ref_vector_tag, target_vector_tag):
-
-	for fkey, attr in mesh.faces(True):
-		vec_1 = attr[ref_vector_tag]
-
-		y = 1.0 / math.tan(math.radians(45.0))
-		x_vec = vec_1
-		y_vec = cross_vectors(x_vec, [0.0, 0.0, 1.0])  # global Z
-		y_vec = scale_vector(y_vec, y)
-		vec_3 = normalize_vector(add_vectors(x_vec, y_vec))
-		
-		mesh.face_attribute(fkey, name=target_vector_tag, value=vec_3)
-
-
 def faces_bisector_field(mesh, vector_tag_1, vector_tag_2, target_vector_tag):
 
 	for fkey, attr in mesh.faces(True):
@@ -259,20 +245,20 @@ def faces_angles(mesh, vector_tag, ref_vector):
 
 	for fkey, attr in mesh.faces(data=True):
 		vector = attr.get(vector_tag)
-		angle = angle_vectors(ref_vector, vector, deg=True)
+		angle = angle_vectors(ref_vector, vector)
 		angles[fkey] = angle
 
 	print('max angle', min(angles.values()))
 	print('min angle', max(angles.values()))
 
 	for idx, angle in angles.items():
-		if angle >= 90.0:
-			angle = 180.0 - angle
+		if angle >= math.pi / 2:  # 90
+			angle = math.pi - angle  # 180
 		angles[idx] = angle
 
 	for idx, angle in angles.items():
-		if angle >= 45:
-			angle = 90.0 - angle
+		if angle >= math.pi / 4:  # 45
+			angle = math.pi / 2 - angle  # 90
 		angles[idx] = angle
 
 	print()
@@ -284,7 +270,7 @@ def faces_angles(mesh, vector_tag, ref_vector):
 
 def vector_from_angle(angle, base_vector=[1.0, 0.0, 0.0]):
 
-	rot_pts = rotate_points([base_vector], math.radians(angle))
+	rot_pts = rotate_points([base_vector], angle)
 	return rot_pts[0]
 
 
@@ -293,7 +279,7 @@ def vectors_from_angles(angles, base_vector=[1.0, 0.0, 0.0]):
 	vectors = {}
 	
 	for fkey, angle in angles.items():
-		rot_pts = rotate_points([base_vector], math.radians(angle))
+		rot_pts = rotate_points([base_vector], angle)
 		vectors[fkey] = vector_from_angle(angle, base_vector)
 
 	return vectors
@@ -331,7 +317,7 @@ def cluster_center_vectors(mesh, centers, cluster_labels, base_vector=[1.0, 1.0,
 		
 		for sign in (-1, 1):
 
-			a = vector_from_angle(sign * 45.0, vec)
+			a = vector_from_angle(sign * math.pi / 4, vec)
 			arrow = line_sdl(cluster_centroid, a, length, both_sides=False)
 
 			center_vectors.append(arrow)
@@ -385,7 +371,7 @@ def principal_angles(fx, fy, fxy):
 	a = 2 * fxy / (fx - fy)
 	b = math.atan(a) / 2
 	
-	return b, b + math.radians(90.0)
+	return b, b + math.pi / 2
 
 
 def aligned_principal_angles(forces, tol=0.01):
@@ -424,8 +410,8 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	# HERE = '../data/json_files/four_point_slab'  # interesting
-	# HERE = '../data/json_files/perimeter_supported_slab' # interesting
-	HERE = '../data/json_files/topleft_supported_slab'  # interesting
+	HERE = '../data/json_files/perimeter_supported_slab' # interesting
+	# HERE = '../data/json_files/topleft_supported_slab'  # interesting
 
 	# HERE = '../data/json_files/leftright_supported_slab'  # interesting
 
@@ -471,7 +457,7 @@ if __name__ == '__main__':
 
 	vector_display_colors = [(50, 50, 50), (50, 50, 50)]
 
-	smooth_iters = 0
+	smooth_iters = 10
 	n_clusters = 3
 
 	data_to_color_tag = "clusters"  # angles, clusters, mass, spacings
@@ -506,7 +492,7 @@ if __name__ == '__main__':
 	mesh_unify_cycles(mesh)
 
 	# ==========================================================================
-	# 45 degrees field
+	# bisector field
 	# ==========================================================================
 
 	faces_bisector_field(mesh, vector_tag, vector_tag_2, bisec_vector_tag)
@@ -541,7 +527,7 @@ if __name__ == '__main__':
 
 		prin_angles[fkey] = pangle
 		ref_moments[fkey] = forces
-		delta_angles[fkey] = pangle - math.radians(angle)
+		delta_angles[fkey] = pangle - angle
 
 
 	# ==========================================================================
@@ -557,7 +543,8 @@ if __name__ == '__main__':
 	labels, centers = cluster(angles, n_clusters, reshape=(-1, 1))
 
 	print('centers')
-	print(centers)
+	for idx, c in enumerate(centers):
+		print(idx, math.degrees(c), "deg")
 
 	# ==========================================================================
 	# Quantized Colors
@@ -580,11 +567,10 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	design_angles = {k: v for k, v in cluster_labels.items()}
-	threshold = math.radians(45.0)
 
 	for fkey in angles.keys():
 		temp = prin_angles[fkey]
-		a = math.radians(design_angles[fkey])
+		a = design_angles[fkey]
 		a += delta_angles[fkey]		
 		design_angles[fkey] = a
 
