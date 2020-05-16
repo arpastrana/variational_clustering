@@ -214,7 +214,7 @@ def faces_labels(labels, centers):
 	return face_labels
 
 
-def faces_bisector_field(mesh, ref_vector_tag, target_vector_tag):
+def faces_bisector_field_old(mesh, ref_vector_tag, target_vector_tag):
 
 	for fkey, attr in mesh.faces(True):
 		vec_1 = attr[ref_vector_tag]
@@ -225,6 +225,15 @@ def faces_bisector_field(mesh, ref_vector_tag, target_vector_tag):
 		y_vec = scale_vector(y_vec, y)
 		vec_3 = normalize_vector(add_vectors(x_vec, y_vec))
 		
+		mesh.face_attribute(fkey, name=target_vector_tag, value=vec_3)
+
+
+def faces_bisector_field(mesh, vector_tag_1, vector_tag_2, target_vector_tag):
+
+	for fkey, attr in mesh.faces(True):
+		vec_1 = attr[vector_tag_1]
+		vec_2 = attr[vector_tag_2]
+		vec_3 = add_vectors(normalize_vector(vec_1), normalize_vector(vec_2))		
 		mesh.face_attribute(fkey, name=target_vector_tag, value=vec_3)
 
 
@@ -416,14 +425,14 @@ if __name__ == '__main__':
 
 	# HERE = '../data/json_files/four_point_slab'  # interesting
 	# HERE = '../data/json_files/perimeter_supported_slab' # interesting
-	# HERE = '../data/json_files/topleft_supported_slab'  # interesting
+	HERE = '../data/json_files/topleft_supported_slab'  # interesting
 
 	# HERE = '../data/json_files/leftright_supported_slab'  # interesting
 
-	HERE = '../data/json_files/bottomleftright_supported_slab'  
+	# HERE = '../data/json_files/bottomleftright_supported_slab'  
 
-	HERE = '../data/json_files/middle_supported_slab_cantilever'
-	# HERE = '../data/json_files/triangle_supported_slab_cantilever'  # interesting
+	# HERE = '../data/json_files/middle_supported_slab_cantilever'
+	# HERE = '../data/json_files/triangle_supported_slab_cantilever'  # interesting
 
 	tags = [
 		'n_1',
@@ -452,21 +461,22 @@ if __name__ == '__main__':
 		]
 
 
-	vector_tag = 'ps_1_top'
-	bisec_vector_tag = 'ps_12_top'
-	cluster_vector_tags = ['ps_1_top_cluster', 'ps_2_top_cluster']
+	vector_tag = 'm_1'
+	vector_tag_2 = 'm_2'
+	bisec_vector_tag = 'm_12_top'
+	cluster_vector_tags = ['m_1_k', 'm_2_k']
 
-	vector_display_tags = ['ps_1_top', 'ps_2_top']
+	vector_display_tags = ['m_1', 'm_2']
 	vector_display_tags = cluster_vector_tags
 
 	vector_display_colors = [(50, 50, 50), (50, 50, 50)]
 
-	smooth_iters = 20
-	n_clusters = 2
+	smooth_iters = 0
+	n_clusters = 3
 
 	data_to_color_tag = "clusters"  # angles, clusters, mass, spacings
 
-	design_set = "ortho"  # ortho, ps, k
+	design_set = "k"  # ortho, ps, k
 
 	steel_tag = "asyb"
 	
@@ -477,7 +487,7 @@ if __name__ == '__main__':
 
 	plot_mesh = True
 
-	export_json = True
+	export_json = False
 
 	fck = 40.0
 	fy = 500.0
@@ -499,7 +509,7 @@ if __name__ == '__main__':
 	# 45 degrees field
 	# ==========================================================================
 
-	faces_bisector_field(mesh, vector_tag, bisec_vector_tag)
+	faces_bisector_field(mesh, vector_tag, vector_tag_2, bisec_vector_tag)
 
 	# ==========================================================================
 	# Process PS vectors
@@ -588,6 +598,48 @@ if __name__ == '__main__':
 	design_moments = design_moments_set[design_set]
 
 	# ==========================================================================
+	# Moments summation
+	# ==========================================================================
+
+	planar_forces = {"mt1": 0.0, "mt2": 0.0, "mb1": 0.0, "mb2": 0.0}
+
+	moments_accum = {m: 0.0 for m in moment_tags}
+	
+	for fkey, moments in design_moments.items():
+		for m, tag in zip(moments, moment_tags):
+			moments_accum[tag] += math.fabs(m)
+
+		mx, my, mxy = moments
+		
+		forces = {"mt1": 0.0, "mt2": 0.0, "mb1": 0.0, "mb2": 0.0}
+
+		forces["mb1"] = mx + math.fabs(mxy)
+		forces["mb2"] = my + math.fabs(mxy)
+		forces["mt1"] = - mx + math.fabs(mxy)
+		forces["mt2"] = - my + math.fabs(mxy)
+
+		for f, v in forces.items():
+			if v < 0.0:
+				forces[f] = 0.0
+				v = 0.0
+			planar_forces[f] += v
+
+	# increase mxy times 2
+	moments_accum["mxy"] *= 2.0
+
+	print()
+	print("cummulative absolute moments")
+	for k, v in moments_accum.items():
+		print(k, v)
+	print("total moments {}".format(sum(moments_accum.values())))
+
+	print()
+	print("cummulative planar forces")
+	for k, v in planar_forces.items():
+		print(k, v)
+	print("total planar forces {}".format(sum(planar_forces.values())))
+
+	# ==========================================================================
 	# Sandwich definition
 	# ==========================================================================
 
@@ -628,7 +680,7 @@ if __name__ == '__main__':
 	# Force statistics
 	# ==========================================================================
 
-	steel_tags = {"asxt": 0.0, "asxb": 0.0, "asxc": 0.0, "asyt": 0.0, "asyb": 0.0, "asyc": 0.0, "ast": 0.0}
+	steel_tags = {"asxt": 0.0, "asxb": 0.0, "asyt": 0.0, "asyb": 0.0}
 	steel_massing = {tag: {} for tag in steel_tags.keys()}
 
 	for fkey in mesh.faces():		
@@ -643,11 +695,12 @@ if __name__ == '__main__':
 	print("masses")
 	for k, v in steel_tags.items():
 		print(k, v)
+	print("total mass {}".format(sum(steel_tags.values())))
 
-	print()
-	for k, v in steel_massing.items():
-		massing = list(v.values())
-		print(k, " ", "min mass", min(massing), "max mass", max(massing))
+	# print()
+	# for k, v in steel_massing.items():
+	# 	massing = list(v.values())
+	# 	print(k, " ", "min mass", min(massing), "max mass", max(massing))
 
 	# ==========================================================================
 	# Mat spacings
@@ -673,15 +726,15 @@ if __name__ == '__main__':
 			steel_spacing[tag][fkey] = spacing
 
 
-	print()
-	print("spacings")
-	for k, v in steel_spacing.items():
-		spacings = np.array([v for v in v.values() if v != -1.0])
-		try:
-			print(k, " ", "min", np.amin(spacings), "max", np.amax(spacings), "mean", \
-			      np.mean(spacings), "median", np.median(spacings))
-		except ValueError:
-			pass
+	# print()
+	# print("spacings")
+	# for k, v in steel_spacing.items():
+	# 	spacings = np.array([v for v in v.values() if v != -1.0])
+	# 	try:
+	# 		print(k, " ", "min", np.amin(spacings), "max", np.amax(spacings), "mean", \
+	# 		      np.mean(spacings), "median", np.median(spacings))
+	# 	except ValueError:
+	# 		pass
 
 	# ==========================================================================
 	# data to plot
