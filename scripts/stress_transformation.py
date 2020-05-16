@@ -16,6 +16,7 @@ from sklearn.cluster import KMeans
 
 from compas.geometry import scale_vector
 from compas.geometry import add_vectors
+from compas.geometry import dot_vectors
 from compas.geometry import normalize_vector
 from compas.geometry import length_vector
 from compas.geometry import cross_vectors
@@ -239,42 +240,13 @@ def smoothed_angles(angles, smooth_iters):
 			angles[fkey] = averaged_angles[fkey]
 
 
-def faces_angles(mesh, vector_tag, ref_vector):
-
-	angles = {}
-
-	for fkey, attr in mesh.faces(data=True):
-		vector = attr.get(vector_tag)
-		angle = angle_vectors(ref_vector, vector)
-		angles[fkey] = angle
-
-	print('max angle', min(angles.values()))
-	print('min angle', max(angles.values()))
-
-	for idx, angle in angles.items():
-		if angle >= math.pi / 2:  # 90
-			angle = math.pi - angle  # 180
-		angles[idx] = angle
-
-	for idx, angle in angles.items():
-		if angle >= math.pi / 4:  # 45
-			angle = math.pi / 2 - angle  # 90
-		angles[idx] = angle
-
-	print()
-	print('max angle', min(angles.values()))
-	print('min angle', max(angles.values()))
-
-	return angles
-
-
-def vector_from_angle(angle, base_vector=[1.0, 0.0, 0.0]):
+def vector_from_angle(angle, base_vector):
 
 	rot_pts = rotate_points([base_vector], angle)
 	return rot_pts[0]
 
 
-def vectors_from_angles(angles, base_vector=[1.0, 0.0, 0.0]):
+def vectors_from_angles(angles, base_vector):
 
 	vectors = {}
 	
@@ -285,7 +257,7 @@ def vectors_from_angles(angles, base_vector=[1.0, 0.0, 0.0]):
 	return vectors
 
 
-def plot_colored_vectors(angles, base_vector=[1.0, 0.0, 0.0]):
+def plot_colored_vectors(angles, base_vector):
 
 	vectors = vectors_from_angles(angles, base_vector)
 
@@ -299,7 +271,7 @@ def plot_colored_vectors(angles, base_vector=[1.0, 0.0, 0.0]):
 	plt.show()
 
 
-def cluster_center_vectors(mesh, centers, cluster_labels, base_vector=[1.0, 1.0, 0.0], length=1.0):
+def cluster_center_vectors(mesh, centers, cluster_labels, base_vector, length=1.0):
 
 	center_vectors = []
 	for center in centers:
@@ -336,7 +308,7 @@ def cluster_arrows(arrows, width=1.0, color=None):
 	return arrows
 
 
-def faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 1.0, 0.0]):
+def faces_clustered_field(mesh, cluster_labels, tags, base_vector):
 
 	for fkey, label in cluster_labels.items():
 		angle = label
@@ -344,7 +316,7 @@ def faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 1.0, 0.0
 		vec = vector_from_angle(angle, base_vector)
 	
 		for sign, tag in zip((-1, 1), tags):
-			rotvec = vector_from_angle(sign * 45.0, vec)
+			rotvec = vector_from_angle(sign * math.pi / 4, vec)
 			mesh.face_attribute(fkey, name=tag, value=rotvec)
 
 
@@ -403,22 +375,53 @@ def bar_area(diameter):
 	return (math.pi * bar_diameter ** 2) / 4.0
 
 
+def faces_angles(mesh, vector_tag, ref_vector):
+
+	angles = {}
+
+	for fkey, attr in mesh.faces(data=True):
+		vector = attr.get(vector_tag)
+		angle = angle_vectors(ref_vector, vector)
+
+		if angle >= math.pi / 2:  # 90
+			angle = math.pi - angle  # 180
+		if angle > math.pi / 4:  # 45
+			angle = math.pi / 2 - angle  # 90
+
+		angles[fkey] = angle
+
+	print()
+	print('min angle', min(angles.values()))
+	print('max angle', max(angles.values()))
+
+	return angles
+
+
+def faces_angles_beta(mesh, vector_tag, ref_vector):
+
+	angles = {}
+
+	for fkey, attr in mesh.faces(data=True):
+		vector = attr.get(vector_tag)
+		u, v = vector, ref_vector
+		
+		angle = math.acos(dot_vectors(u, v) / (length_vector(u) * length_vector(v)))
+		angle = min(angle, math.fabs(math.pi - angle))
+		angle = math.fabs(angle - math.pi / 4)
+
+		angles[fkey] = angle
+
+	print('min angle', min(angles.values()))
+	print('max angle', max(angles.values()))
+
+	return angles
+
+
 if __name__ == '__main__':
 
 	# ==========================================================================
 	# Constants
 	# ==========================================================================
-
-	# HERE = '../data/json_files/four_point_slab'  # interesting
-	HERE = '../data/json_files/perimeter_supported_slab' # interesting
-	# HERE = '../data/json_files/topleft_supported_slab'  # interesting
-
-	# HERE = '../data/json_files/leftright_supported_slab'  # interesting
-
-	# HERE = '../data/json_files/bottomleftright_supported_slab'  
-
-	# HERE = '../data/json_files/middle_supported_slab_cantilever'
-	# HERE = '../data/json_files/triangle_supported_slab_cantilever'  # interesting
 
 	tags = [
 		'n_1',
@@ -447,6 +450,15 @@ if __name__ == '__main__':
 		]
 
 
+	HERE = '../data/json_files/four_point_slab'  # interesting
+	# HERE = '../data/json_files/perimeter_supported_slab' # interesting
+	# HERE = '../data/json_files/topleft_supported_slab'  # interesting
+	# HERE = '../data/json_files/bottomleftright_supported_slab'  # interesting
+	# HERE = '../data/json_files/triangle_supported_slab_cantilever'  # interesting
+	# HERE = '../data/json_files/middle_supported_slab_cantilever'
+	# HERE = '../data/json_files/leftright_supported_slab'
+
+
 	vector_tag = 'm_1'
 	vector_tag_2 = 'm_2'
 	bisec_vector_tag = 'm_12_top'
@@ -471,7 +483,7 @@ if __name__ == '__main__':
 	draw_kmeans_colors = False  # 2d representation
 	draw_arrows = False
 
-	plot_mesh = True
+	plot_mesh = False
 
 	export_json = False
 
@@ -501,7 +513,8 @@ if __name__ == '__main__':
 	# Process PS vectors
 	# ==========================================================================
 
-	angles = faces_angles(mesh, bisec_vector_tag, ref_vector=[1.0, 1.0, 0.0])
+	# angles = faces_angles(mesh, bisec_vector_tag, ref_vector=[1.0, 1.0, 0.0])
+	angles = faces_angles_beta(mesh, bisec_vector_tag, ref_vector=[1.0, 0.0, 0.0])
 
 	# ==========================================================================
 	# Compute principal forces
@@ -516,19 +529,21 @@ if __name__ == '__main__':
 
 	for fkey in mesh.faces():		
 		forces = mesh.face_attributes(fkey, names=moment_tags)
-
-		karamba_moments = mesh.face_attributes(fkey, names=ref_moment_tags)
-
 		pforces = principal_forces(*forces)
 		pangles = aligned_principal_angles(forces, tol=0.01)
 
 		pangle = pangles[0]
 		angle = angles[fkey]
 
-		prin_angles[fkey] = pangle
 		ref_moments[fkey] = forces
+		prin_angles[fkey] = pangle
 		delta_angles[fkey] = pangle - angle
 
+	print('min self calculated princ angles', min(prin_angles.values()))
+	print('max self calculated princ angles', max(prin_angles.values()))
+
+	print('min delta', min(delta_angles.values()))
+	print('max delta', max(delta_angles.values()))
 
 	# ==========================================================================
 	# Average smooth angles
@@ -560,19 +575,16 @@ if __name__ == '__main__':
 	# ==========================================================================
 
 	tags = cluster_vector_tags
-	faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 1.0, 0.0])
+	# faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 1.0, 0.0])
+	faces_clustered_field(mesh, cluster_labels, tags, base_vector=[1.0, 0.0, 0.0])
 
 	# ==========================================================================
 	# Transform forces for design
 	# ==========================================================================
 
 	design_angles = {k: v for k, v in cluster_labels.items()}
-
 	for fkey in angles.keys():
-		temp = prin_angles[fkey]
-		a = design_angles[fkey]
-		a += delta_angles[fkey]		
-		design_angles[fkey] = a
+		design_angles[fkey] = design_angles[fkey] + delta_angles[fkey]
 
 
 	design_moments_set = {
@@ -611,7 +623,7 @@ if __name__ == '__main__':
 			planar_forces[f] += v
 
 	# increase mxy times 2
-	moments_accum["mxy"] *= 2.0
+	# moments_accum["mxy"] *= 2.0
 
 	print()
 	print("cummulative absolute moments")
@@ -619,11 +631,11 @@ if __name__ == '__main__':
 		print(k, v)
 	print("total moments {}".format(sum(moments_accum.values())))
 
-	print()
-	print("cummulative planar forces")
-	for k, v in planar_forces.items():
-		print(k, v)
-	print("total planar forces {}".format(sum(planar_forces.values())))
+	# print()
+	# print("cummulative planar forces")
+	# for k, v in planar_forces.items():
+	# 	print(k, v)
+	# print("total planar forces {}".format(sum(planar_forces.values())))
 
 	# ==========================================================================
 	# Sandwich definition
@@ -663,7 +675,31 @@ if __name__ == '__main__':
 		shells[fkey] = shell
 
 	# ==========================================================================
-	# Force statistics
+	# Bending statistics
+	# ==========================================================================
+
+	force_tags = {"nsxb": 0.0, "nsxt": 0.0, "nsyb": 0.0, "nsyt": 0.0}
+	force_ac = {tag: {} for tag in force_tags.keys()}
+
+	for fkey in mesh.faces():		
+		shell = shells[fkey]
+
+		for tag in force_tags.keys():
+			force = getattr(shell, tag)
+			if force < 0.0:
+				force = 0.0
+			force *= (shell_thickness - cover)  # revert to bending moments
+			force_ac[tag][fkey] = force
+			force_tags[tag] += force
+
+	print()
+	print("forces")
+	for k, v in force_tags.items():
+		print(k, v)
+	print("total force {}".format(sum(force_tags.values())))
+
+	# ==========================================================================
+	# Mass statistics
 	# ==========================================================================
 
 	steel_tags = {"asxt": 0.0, "asxb": 0.0, "asyt": 0.0, "asyb": 0.0}
@@ -675,13 +711,13 @@ if __name__ == '__main__':
 		for tag in steel_tags.keys():
 			mass = getattr(shell, tag)
 			steel_massing[tag][fkey] = mass
-			steel_tags[tag] +=mass
+			steel_tags[tag] += mass
 
-	print()
-	print("masses")
-	for k, v in steel_tags.items():
-		print(k, v)
-	print("total mass {}".format(sum(steel_tags.values())))
+	# print()
+	# print("masses")
+	# for k, v in steel_tags.items():
+	# 	print(k, v)
+	# print("total mass {}".format(sum(steel_tags.values())))
 
 	# print()
 	# for k, v in steel_massing.items():
