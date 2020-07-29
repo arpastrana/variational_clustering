@@ -11,7 +11,8 @@ __all__ = ["furthest_init", "output_cls", "get_new_clusters", "clear_clusters", 
 
 def furthest_init(num, faces, callback=None):  # no dependency
 
-    clusters = {0: Cluster(0, 0)}
+    seed = min(list(faces.keys()))
+    clusters = {0: Cluster(id_=0, seed_face=seed)}
     all_clusters = []
 
     for i in range(num):
@@ -61,14 +62,14 @@ def clear_clusters(faces):
         face.clear_cluster()
 
 
-def make_faces(mesh, tag):  # no dep
+def make_faces(mesh, vectors):  # no dep
     faces = {}
 
     for f_key in mesh.faces():
         face = Face(f_key)
 
+        vector = vectors[f_key]
         halfedges = mesh.face_halfedges(f_key)
-        vector = mesh.face_attribute(f_key, tag)
 
         face.set_halfedges([tuple(sorted(h)) for h in halfedges])
         face.set_vertices(mesh.face_vertices(f_key))
@@ -78,6 +79,9 @@ def make_faces(mesh, tag):  # no dep
         face.set_vector(vector)
         face.set_weighed_vector(vector)
         face.set_angle(vector)
+
+        face.set_coordinates(mesh.face_coordinates(f_key))
+        face.set_centroid(mesh.face_centroid(f_key))
 
         faces[f_key] = face
 

@@ -54,6 +54,12 @@ class Face():
     def set_neighbours(self, neighbours):
         self.neighbours = [n for n in neighbours if n is not None]
 
+    def set_coordinates(self, coordinates):
+        self.coordinates = coordinates
+
+    def set_centroid(self, centroid):
+        self.centroid = centroid
+
     def get_error(self, proxy):
         func = self.get_error_vector
         # func = self.get_error_angle
