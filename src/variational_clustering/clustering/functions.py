@@ -6,11 +6,31 @@ from variational_clustering.operations import get_cluster_to_split
 from variational_clustering.operations import split_cluster
 
 
-__all__ = ["furthest_init", "output_cls", "get_new_clusters", "clear_clusters", "make_faces"]
+__all__ = ["furthest_init",
+           "output_cls",
+           "get_new_clusters",
+           "clear_clusters",
+           "make_faces"]
 
 
 def furthest_init(num, faces, callback=None):  # no dependency
+    """
+    Initialize cluster seeds with a furthest seeding strategy.
 
+    Parameters
+    ----------
+    num : `int`
+        The total number of clusters.
+    faces : `dict` of `Face`
+        A dictionary of faces.
+    callback : `function`. Optional.
+        An additional function to call at the end of every iteration.
+
+    Returns
+    -------
+    all_clusters : `list` of `dict`
+        A list with the clusters created at every iteration.
+    """
     seed = min(list(faces.keys()))
     clusters = {0: Cluster(id_=0, seed_face=seed)}
     all_clusters = []
@@ -63,6 +83,20 @@ def clear_clusters(faces):
 
 
 def make_faces(mesh, vectors):  # no dep
+    """
+    Initialize a dictionary of `Face` objects.
+
+    Parameters
+    ----------
+    mesh : `compas.Mesh`
+        A COMPAS mesh.
+    vectors : `dict`
+        A mapping of face keys to vectors {fkey: vector}
+
+    Notes
+    -----
+    Faces and vectors keys are assumed to match.
+    """
     faces = {}
 
     for f_key in mesh.faces():

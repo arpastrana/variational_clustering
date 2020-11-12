@@ -11,19 +11,46 @@ __all__ = ['k_means']
 
 
 def k_means(clusters, faces, iters, mergesplit=True, callback=None):
-    '''
-    2. Run for N given iterations only.
-    1. Create Cluster Colors. Make global *counter*.
-    2B. Create Proxys with *get_proxy*
-    3. Test whether it is the 1st iteration or not with global *counter*.
-    4. If 1st, get proxies from clusters through from *get_proxy_seed*
-    4B. If not, proxies are the regions. Or the other way around.
-    5. Build a queue with the seeds' adjacent faces through *build_queue*
-    6. Grow up a cluster with *assign_to_region* method.
-    7. Create new proxies from created regions with *grow_seeds* method.
-    8. New proxies become the proxies.
-    9. Repeat
-    '''
+    """
+    Find directional clusters using variational k-means.
+
+    Parameters
+    ----------
+    clusters : `dict` of `Cluster`
+        A dictionary with the initial clusters.
+    faces : `dict` of `Face`
+        A dictionary with the face objects to cluster.
+    iters : `int`
+        The number of iterations to run the algorithm for.
+    mergesplit : `bool`. Optional
+        A flag to activate the merge splitting operation for ambiguous clusters.
+        Defaults to `True`.
+    callback : `bool`. Optional
+        A function to run at every iteration.
+
+    Returns
+    -------
+    all_clusters : `list` of `dict`
+        A list with all the clusters generated per iteration.
+
+    Notes
+    -----
+
+    An outline of the process is as follows:
+
+        1. Run for N given iterations only.
+        2. Create Cluster Colors. Make global *counter*.
+        3. Create Proxys with *get_proxy*
+        4. Test whether it is the 1st iteration or not with global *counter*.
+        5. If 1st, get proxies from clusters through from *get_proxy_seed*
+        6. If not, proxies are the regions. Or the other way around.
+        7. Build a queue with the seeds' adjacent faces through *build_queue*
+        8. Grow up a cluster with *assign_to_region* method.
+        9. Create new proxies from created regions with *grow_seeds* method.
+        10. New proxies become the proxies.
+        11. Repeat
+    """
+
     all_clusters = []
 
     for it in range(iters):

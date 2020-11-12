@@ -64,18 +64,19 @@ def execute_merge_split(t_m, t_s, threshold=0.5):
 
     dif = merged_err - to_merge_err
 
-    print()
-    print('combined error', to_merge_err)
-    print('simulated merge error', merged_err)
-    print('error difference', dif)
     worst_err = t_s.get_distortion()
-    print('worst error', worst_err)
+
+    # print()
+    # print('combined error', to_merge_err)
+    # print('simulated merge error', merged_err)
+    # print('error difference', dif)
+    # print('worst error', worst_err)
 
     if math.fabs(dif) < threshold * worst_err:  # 0.5, not squared
-        print('merge-split is True')
+        # print('merge-split is True')
         return True
 
-    print('merge-split is False')
+    # print('merge-split is False')
     return False
 
 
