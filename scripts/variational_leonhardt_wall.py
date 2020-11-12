@@ -7,12 +7,6 @@ from variational_clustering.clustering import make_faces
 from variational_clustering.clustering import furthest_init
 from variational_clustering.clustering import k_means
 
-from directional_clustering.clusters import faces_angles
-from directional_clustering.clusters import faces_labels
-from directional_clustering.clusters import kmeans_clustering
-from directional_clustering.clusters import kmeans_errors
-from directional_clustering.clusters import faces_clustered_field
-
 from directional_clustering.plotters import ClusterPlotter
 from directional_clustering.plotters import rgb_colors
 from directional_clustering.plotters import plot_colored_vectors
@@ -43,23 +37,23 @@ tags = [
     "custom_2"
     ]
 
-HERE = "../data/json_files/two_point_wall"
+HERE = "../data/json_files/perimeter_supported_slab"
 
 THERE = HERE.replace("json_files", "images")
 
-base_vector_tag = "n_1"
-transformable_vector_tags = ["n_1", "n_2"]
-vector_cluster_tags = ["n_1_k", "n_2_k"]
+base_vector_tag = "m_1"
+transformable_vector_tags = ["m_1", "m_2"]
+vector_cluster_tags = ["m_1_k", "m_2_k"]
 vector_display_tags = [base_vector_tag]
 
 vector_display_colors = [(0, 0, 0), (255, 0, 0)]  # blue and red
 perp_flags = [False, True]
 line_width = 1.0
 
-n_clusters = 7  # int or auto
+n_clusters = 5  # int or auto
 iters = 30
 mergesplit = True
-x_lim = 0.0
+x_lim = -10.0
 
 smooth_iters = 0  # currently fails because vectors are flipped everywhere
 damping = 0.5
@@ -69,7 +63,7 @@ save_fig = False
 
 data_to_color_tag = "clusters"  # angles, clusters, uncolored
 
-draw_vector_field = True
+draw_vector_field = False
 uniform_length = True
 vector_length = 0.05  # 0.005 if not uniform, 0.05 otherwise
 
