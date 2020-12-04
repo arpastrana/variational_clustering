@@ -11,7 +11,7 @@ __all__ = ['Proxy', 'get_proxy_angle', 'get_proxy_vector', 'proxy_maker']
 
 class Proxy(object):
 	def __call__(self, faces):
-		return get_proxy_weighed_vector(faces)
+		return get_proxy_vector(faces)
 
 
 def get_proxy_angle(faces):
